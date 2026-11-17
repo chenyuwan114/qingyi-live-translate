@@ -10,6 +10,5 @@ async function command(type) {
   } catch (error) { status.textContent = error.message; }
 }
 document.getElementById('subtitle').onclick = () => command('START_SUBTITLE');
-document.getElementById('online').onclick = () => command('START_SUBTITLE_ONLINE');
 document.getElementById('audio').onclick = () => command('START_AUDIO');
 document.getElementById('stop').onclick = () => command('STOP');

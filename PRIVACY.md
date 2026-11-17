@@ -6,10 +6,6 @@
 
 扩展读取当前页面可访问的英文字幕，并调用桌面版 Chrome 内置 Translator API 翻译。字幕和译文由 Chrome 在本机处理；Chrome 负责下载并管理翻译语言包。
 
-## 在线字幕模式
-
-只有用户主动选择「在线字幕」时，扩展才会把当前字幕文本发送给 MyMemory 的翻译 API。该服务由 Translated S.r.l. 运营，服务方的条款说明提交的翻译片段可能被长期保存，并可能交由外部机器翻译合作方处理。请勿在此模式中翻译机密、个人敏感或受保密义务约束的内容。详情见 [MyMemory 服务条款](https://mymemory.translated.net/terms-and-conditions)。
-
 ## 标签页声音模式
 
 只有用户主动启动声音模式时，扩展才捕获当前标签页的音频以识别语音。Chrome 的 `SpeechRecognition` 服务可能会将音频或识别内容发送到 Google 或其服务提供方；具体处理方式受 Chrome、账号、地区和浏览器设置影响。该模式不适合机密音频。

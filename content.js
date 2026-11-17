@@ -3,7 +3,6 @@
   globalThis.__qingyiInstalled = true;
   const isTop = window === window.top;
   let mode = null;
-  let provider = 'local';
   let timer = null;
   let translator = null;
   function onTranslatorState(state) {
@@ -13,11 +12,7 @@
     if (state.phase === 'download-required') $('zh').textContent = '等待英中语言包';
     if (state.phase === 'error') $('zh').textContent = '翻译暂不可用';
   }
-  function makeTranslator(nextProvider) {
-    return nextProvider === 'online'
-      ? new globalThis.QingyiOnlineTranslator({onState: onTranslatorState})
-      : new globalThis.QingyiTranslator({onState: onTranslatorState});
-  }
+  function makeTranslator() { return new globalThis.QingyiTranslator({onState: onTranslatorState}); }
   let lastSource = '';
   let sequence = 0;
   let queuedText = '';
@@ -26,17 +21,44 @@
   let rootsCheckedAt = 0;
   let timedCaptions = null;
   let timedCaptionVideo = null;
-  let upcomingCaption = '';
 
   const host = document.createElement('div');
   host.id = 'qingyi-root';
-  host.style.cssText = 'position:fixed!important;right:20px!important;bottom:24px!important;z-index:2147483647!important;pointer-events:none!important';
+  host.setAttribute('popover', 'manual');
+  host.style.cssText = 'position:fixed!important;left:auto!important;top:auto!important;right:20px!important;bottom:24px!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;overflow:visible!important;z-index:2147483647!important;pointer-events:none!important';
   const root = host.attachShadow({mode: 'closed'});
   root.innerHTML = `<style>
     *{box-sizing:border-box} .box{width:min(560px,calc(100vw - 40px));padding:13px 16px;border-radius:14px;background:rgba(9,18,34,.88);color:#fff;font:16px/1.45 system-ui,"Microsoft YaHei",sans-serif;box-shadow:0 8px 32px #0008;backdrop-filter:blur(8px);pointer-events:auto}
-    .head{display:flex;justify-content:space-between;align-items:center;color:#91b7e8;font-size:11px;margin-bottom:6px}.close{border:0;background:transparent;color:#aab6c8;cursor:pointer;font-size:18px;line-height:1}.en{color:#bbcce5;font-size:12px;max-height:38px;overflow:hidden}.zh{font-size:20px;font-weight:650;margin-top:4px;min-height:26px}.status{color:#ffd398;font-size:12px;margin-top:4px}.prepare{display:none;margin-top:8px;border:0;border-radius:7px;background:#3377db;color:white;padding:6px 10px;cursor:pointer}.retry{background:#6a4d23}
+    .head{display:flex;justify-content:space-between;align-items:center;color:#91b7e8;font-size:11px;margin-bottom:6px;cursor:grab;touch-action:none}.head:active{cursor:grabbing}.close{border:0;background:transparent;color:#aab6c8;cursor:pointer;font-size:18px;line-height:1}.en{color:#bbcce5;font-size:12px;max-height:38px;overflow:hidden}.zh{font-size:20px;font-weight:650;margin-top:4px;min-height:26px}.status{color:#ffd398;font-size:12px;margin-top:4px}.prepare{display:none;margin-top:8px;border:0;border-radius:7px;background:#3377db;color:white;padding:6px 10px;cursor:pointer}.retry{background:#6a4d23}
   </style><div class="box"><div class="head"><span id="label">轻译</span><button class="close" title="停止">×</button></div><div class="en" id="en"></div><div class="zh" id="zh">等待英文内容…</div><div class="status" id="status"></div><button class="prepare" id="prepare">下载英中语言包并开始</button><button class="prepare retry" id="retry">重试翻译</button></div>`;
   const $ = id => root.getElementById(id);
+  const dragHandle = root.querySelector('.head');
+  let drag = null;
+  dragHandle.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || event.target.closest('button')) return;
+    const rect = host.getBoundingClientRect();
+    drag = {pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top};
+    host.style.setProperty('left', `${rect.left}px`, 'important');
+    host.style.setProperty('top', `${rect.top}px`, 'important');
+    host.style.setProperty('right', 'auto', 'important');
+    host.style.setProperty('bottom', 'auto', 'important');
+    dragHandle.setPointerCapture(event.pointerId);
+  });
+  dragHandle.addEventListener('pointermove', event => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const rect = host.getBoundingClientRect();
+    const left = Math.max(0, Math.min(window.innerWidth - rect.width, event.clientX - drag.offsetX));
+    const top = Math.max(0, Math.min(window.innerHeight - rect.height, event.clientY - drag.offsetY));
+    host.style.setProperty('left', `${left}px`, 'important');
+    host.style.setProperty('top', `${top}px`, 'important');
+  });
+  const endDrag = event => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag = null;
+    if (dragHandle.hasPointerCapture(event.pointerId)) dragHandle.releasePointerCapture(event.pointerId);
+  };
+  dragHandle.addEventListener('pointerup', endDrag);
+  dragHandle.addEventListener('pointercancel', endDrag);
   root.querySelector('.close').onclick = () => { chrome.runtime.sendMessage({type: 'STOP'}).catch(() => {}); stop(); };
   $('prepare').onclick = () => {
     $('prepare').style.display = 'none';
@@ -49,9 +71,24 @@
     if (lastSource) queuedText = lastSource;
     drainTranslations();
   };
-  function mount() { if (isTop && !host.isConnected) (document.body || document.documentElement).append(host); }
+  function promoteOverlay() {
+    if (!host.isConnected || typeof host.showPopover !== 'function') return;
+    // Fullscreen video is placed in the browser's top layer above ordinary DOM
+    // stacking contexts. Reopening the popover after fullscreenchange puts the
+    // translation panel above the fullscreen player as well.
+    if (host.matches(':popover-open')) host.hidePopover();
+    host.showPopover();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (host.isConnected) requestAnimationFrame(promoteOverlay);
+  });
+  function mount() {
+    if (!isTop) return;
+    if (!host.isConnected) (document.body || document.documentElement).append(host);
+    promoteOverlay();
+  }
   function status(value) { $('status').textContent = value || ''; }
-  function stop() { mode = null; if (timer) clearInterval(timer); timer = null; host.remove(); lastSource = ''; queuedText = ''; sequence++; translator?.reset(); translator = null; }
+  function stop() { mode = null; if (timer) clearInterval(timer); timer = null; if (host.matches(':popover-open')) host.hidePopover(); host.remove(); lastSource = ''; queuedText = ''; sequence++; translator?.reset(); translator = null; }
   function normalize(text) {
     return (text || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 400);
   }
@@ -93,7 +130,6 @@
     const time = video.currentTime;
     const index = timedCaptions.findIndex(item => time >= item.start && time < item.end);
     const group = timedCaptions[index];
-    upcomingCaption = index >= 0 ? timedCaptions[index + 1]?.text || '' : '';
     return group?.text || '';
   }
   async function drainTranslations() {
@@ -109,9 +145,6 @@
           const chinese = await engine.translate(text);
           if (mode && session === sequence) {
             $('zh').textContent = applyTerminology(text, chinese);
-            if (provider === 'online' && upcomingCaption && upcomingCaption !== text) {
-              engine.translate(upcomingCaption).catch(() => {});
-            }
           }
         } catch (error) {
           if (error.code === 'DOWNLOAD_REQUIRED') { queuedText = lastSource; break; }
@@ -181,14 +214,13 @@
     }
     return '';
   }
-  function start(nextMode, nextProvider = 'local') {
+  function start(nextMode) {
     stop();
     mode = nextMode;
-    provider = nextProvider;
     mount();
     if (isTop) {
-      translator = makeTranslator(provider);
-      $('label').textContent = nextMode === 'audio' ? '轻译 · 声音' : provider === 'online' ? '轻译 · 在线字幕' : '轻译 · 英文字幕';
+      translator = makeTranslator();
+      $('label').textContent = nextMode === 'audio' ? '轻译 · 声音' : '轻译 · 英文字幕';
       $('zh').textContent = nextMode === 'audio' ? '等待英文声音…' : '等待英文字幕…';
       status(nextMode === 'audio' ? '正在连接标签页声音…' : '正在读取英文字幕…');
       translator.prepare(false).then(() => drainTranslations()).catch(() => {});
@@ -202,11 +234,11 @@
     }, 120);
   }
   chrome.runtime.onMessage.addListener(message => {
-    if (message.type === 'START') start(message.mode, message.provider);
+    if (message.type === 'START') start(message.mode);
     else if (message.type === 'STOP') stop();
     else if (message.type === 'AUDIO_TEXT' && isTop && mode === 'audio') translate(message.text);
     else if (message.type === 'FRAME_CAPTION' && isTop && mode === 'subtitle') translate(message.text);
     else if (message.type === 'AUDIO_STATUS') status(message.error || '声音识别已停止');
   });
-  chrome.runtime.sendMessage({type: 'GET_MODE'}).then(result => { if (result?.mode && !mode) start(result.mode, result.provider); }).catch(() => {});
+  chrome.runtime.sendMessage({type: 'GET_MODE'}).then(result => { if (result?.mode && !mode) start(result.mode); }).catch(() => {});
 })();
