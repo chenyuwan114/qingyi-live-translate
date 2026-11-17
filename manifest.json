@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "轻译 · 英中同声字幕",
+  "version": "0.6.1",
+  "description": "通过网页英文字幕或标签页声音显示实时中文字幕",
+  "minimum_chrome_version": "138",
+  "permissions": ["activeTab", "scripting", "tabCapture", "offscreen", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [{"matches": ["<all_urls>"], "js": ["translation-engine.js", "online-translation-engine.js", "content.js"], "all_frames": true, "match_about_blank": true}],
+  "action": { "default_popup": "popup.html", "default_title": "轻译" },
+  "background": { "service_worker": "background.js" }
+}
