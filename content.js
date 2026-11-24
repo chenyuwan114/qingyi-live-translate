@@ -28,9 +28,9 @@
   host.style.cssText = 'position:fixed!important;left:auto!important;top:auto!important;right:20px!important;bottom:24px!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;overflow:visible!important;z-index:2147483647!important;pointer-events:none!important';
   const root = host.attachShadow({mode: 'closed'});
   root.innerHTML = `<style>
-    *{box-sizing:border-box} .box{width:min(560px,calc(100vw - 40px));padding:13px 16px;border-radius:14px;background:rgba(9,18,34,.88);color:#fff;font:16px/1.45 system-ui,"Microsoft YaHei",sans-serif;box-shadow:0 8px 32px #0008;backdrop-filter:blur(8px);pointer-events:auto}
-    .head{display:flex;justify-content:space-between;align-items:center;color:#91b7e8;font-size:11px;margin-bottom:6px;cursor:grab;touch-action:none}.head:active{cursor:grabbing}.close{border:0;background:transparent;color:#aab6c8;cursor:pointer;font-size:18px;line-height:1}.en{color:#bbcce5;font-size:12px;max-height:38px;overflow:hidden}.zh{font-size:20px;font-weight:650;margin-top:4px;min-height:26px}.status{color:#ffd398;font-size:12px;margin-top:4px}.prepare{display:none;margin-top:8px;border:0;border-radius:7px;background:#3377db;color:white;padding:6px 10px;cursor:pointer}.retry{background:#6a4d23}
-  </style><div class="box"><div class="head"><span id="label">轻译</span><button class="close" title="停止">×</button></div><div class="en" id="en"></div><div class="zh" id="zh">等待英文内容…</div><div class="status" id="status"></div><button class="prepare" id="prepare">下载英中语言包并开始</button><button class="prepare retry" id="retry">重试翻译</button></div>`;
+    *{box-sizing:border-box} .box{display:flex;flex-direction:column;width:min(560px,calc(100vw - 40px));height:140px;min-width:min(280px,calc(100vw - 40px));min-height:96px;max-width:calc(100vw - 40px);max-height:calc(100vh - 48px);resize:both;overflow:auto;padding:13px 16px;border-radius:14px;background:rgba(9,18,34,.88);color:#fff;font:16px/1.45 system-ui,"Microsoft YaHei",sans-serif;box-shadow:0 8px 32px #0008;backdrop-filter:blur(8px);pointer-events:auto}
+    .head{flex:none;display:flex;justify-content:space-between;align-items:center;color:#91b7e8;font-size:11px;margin-bottom:6px;cursor:grab;touch-action:none}.head:active{cursor:grabbing}.close{border:0;background:transparent;color:#aab6c8;cursor:pointer;font-size:18px;line-height:1}.zh{flex:1;font-size:20px;font-weight:650;margin-top:4px;min-height:26px}.status{flex:none;color:#ffd398;font-size:12px;margin-top:4px}.prepare{flex:none;display:none;margin-top:8px;border:0;border-radius:7px;background:#3377db;color:white;padding:6px 10px;cursor:pointer}.retry{background:#6a4d23}
+  </style><div class="box"><div class="head"><span id="label">轻译</span><button class="close" title="停止">×</button></div><div class="zh" id="zh">等待英文内容…</div><div class="status" id="status"></div><button class="prepare" id="prepare">下载英中语言包并开始</button><button class="prepare retry" id="retry">重试翻译</button></div>`;
   const $ = id => root.getElementById(id);
   const dragHandle = root.querySelector('.head');
   let drag = null;
@@ -161,7 +161,6 @@
     const english = normalize(raw);
     if (!english || (!force && english === lastSource)) return;
     lastSource = english;
-    $('en').textContent = english;
     queuedText = english;
     if ($('zh').textContent === '等待英文声音…' || $('zh').textContent === '等待英文字幕…') $('zh').textContent = '翻译中…';
     drainTranslations();

@@ -42,7 +42,6 @@ test('DeepLearning captions reach a visible Chinese translation', async () => {
   const view = page({availability: async () => 'available', create: async () => ({translate: async () => '你很快就会看到三个主要好处。', destroy() {}})});
   view.receive({type: 'START', mode: 'subtitle'});
   await tick(180);
-  assert.match(view.element('en').textContent, /three main benefits/);
   assert.equal(view.element('zh').textContent, '你很快就会看到三个主要好处。');
   view.stop();
 });
@@ -50,7 +49,6 @@ test('missing language pack stays visible and offers a download button', async (
   const view = page({availability: async () => 'downloadable', create: async () => { throw new Error('must not download automatically'); }});
   view.receive({type: 'START', mode: 'subtitle'});
   await tick(180);
-  assert.match(view.element('en').textContent, /three main benefits/);
   assert.equal(view.element('zh').textContent, '等待英中语言包');
   assert.equal(view.element('prepare').style.display, 'inline-block');
   assert.match(view.element('status').textContent, /下载/);
