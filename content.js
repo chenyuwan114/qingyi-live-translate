@@ -28,23 +28,26 @@
   host.style.cssText = 'position:fixed!important;left:auto!important;top:auto!important;right:20px!important;bottom:24px!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;overflow:visible!important;z-index:2147483647!important;pointer-events:none!important';
   const root = host.attachShadow({mode: 'closed'});
   root.innerHTML = `<style>
-    *{box-sizing:border-box} .box{display:flex;flex-direction:column;width:min(560px,calc(100vw - 40px));height:140px;min-width:min(280px,calc(100vw - 40px));min-height:96px;max-width:calc(100vw - 40px);max-height:calc(100vh - 48px);resize:both;overflow:auto;padding:13px 16px;border-radius:14px;background:rgba(9,18,34,.88);color:#fff;font:16px/1.45 system-ui,"Microsoft YaHei",sans-serif;box-shadow:0 8px 32px #0008;backdrop-filter:blur(8px);pointer-events:auto}
-    .head{flex:none;display:flex;justify-content:space-between;align-items:center;color:#91b7e8;font-size:11px;margin-bottom:6px;cursor:grab;touch-action:none}.head:active{cursor:grabbing}.close{border:0;background:transparent;color:#aab6c8;cursor:pointer;font-size:18px;line-height:1}.zh{flex:1;font-size:20px;font-weight:650;margin-top:4px;min-height:26px}.status{flex:none;color:#ffd398;font-size:12px;margin-top:4px}.prepare{flex:none;display:none;margin-top:8px;border:0;border-radius:7px;background:#3377db;color:white;padding:6px 10px;cursor:pointer}.retry{background:#6a4d23}
+    *{box-sizing:border-box} .box{display:flex;flex-direction:column;width:min(560px,calc(100vw - 40px));height:140px;min-width:min(280px,calc(100vw - 40px));min-height:96px;max-width:calc(100vw - 40px);max-height:calc(100vh - 48px);resize:both;overflow:auto;padding:13px 16px;border-radius:14px;background:rgba(9,18,34,.88);color:#fff;font:16px/1.45 system-ui,"Microsoft YaHei",sans-serif;box-shadow:0 8px 32px #0008;backdrop-filter:blur(8px);pointer-events:auto;cursor:move;user-select:none;touch-action:none}
+    .head{flex:none;display:flex;justify-content:space-between;align-items:center;color:#91b7e8;font-size:11px;margin-bottom:6px;cursor:move}.close{border:0;background:transparent;color:#aab6c8;cursor:pointer;font-size:18px;line-height:1}.zh{flex:1;font-size:20px;font-weight:650;margin-top:4px;min-height:26px}.status{flex:none;color:#ffd398;font-size:12px;margin-top:4px}.prepare{flex:none;display:none;margin-top:8px;border:0;border-radius:7px;background:#3377db;color:white;padding:6px 10px;cursor:pointer}.retry{background:#6a4d23}
   </style><div class="box"><div class="head"><span id="label">轻译</span><button class="close" title="停止">×</button></div><div class="zh" id="zh">等待英文内容…</div><div class="status" id="status"></div><button class="prepare" id="prepare">下载英中语言包并开始</button><button class="prepare retry" id="retry">重试翻译</button></div>`;
   const $ = id => root.getElementById(id);
-  const dragHandle = root.querySelector('.head');
+  const dragSurface = root.querySelector('.box');
   let drag = null;
-  dragHandle.addEventListener('pointerdown', event => {
+  dragSurface.addEventListener('pointerdown', event => {
     if (event.button !== 0 || event.target.closest('button')) return;
     const rect = host.getBoundingClientRect();
+    // Leave the browser's native bottom-right resize grip available.
+    if (event.clientX >= rect.right - 24 && event.clientY >= rect.bottom - 24) return;
+    event.preventDefault();
     drag = {pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top};
     host.style.setProperty('left', `${rect.left}px`, 'important');
     host.style.setProperty('top', `${rect.top}px`, 'important');
     host.style.setProperty('right', 'auto', 'important');
     host.style.setProperty('bottom', 'auto', 'important');
-    dragHandle.setPointerCapture(event.pointerId);
+    dragSurface.setPointerCapture(event.pointerId);
   });
-  dragHandle.addEventListener('pointermove', event => {
+  dragSurface.addEventListener('pointermove', event => {
     if (!drag || drag.pointerId !== event.pointerId) return;
     const rect = host.getBoundingClientRect();
     const left = Math.max(0, Math.min(window.innerWidth - rect.width, event.clientX - drag.offsetX));
@@ -55,10 +58,10 @@
   const endDrag = event => {
     if (!drag || drag.pointerId !== event.pointerId) return;
     drag = null;
-    if (dragHandle.hasPointerCapture(event.pointerId)) dragHandle.releasePointerCapture(event.pointerId);
+    if (dragSurface.hasPointerCapture(event.pointerId)) dragSurface.releasePointerCapture(event.pointerId);
   };
-  dragHandle.addEventListener('pointerup', endDrag);
-  dragHandle.addEventListener('pointercancel', endDrag);
+  dragSurface.addEventListener('pointerup', endDrag);
+  dragSurface.addEventListener('pointercancel', endDrag);
   root.querySelector('.close').onclick = () => { chrome.runtime.sendMessage({type: 'STOP'}).catch(() => {}); stop(); };
   $('prepare').onclick = () => {
     $('prepare').style.display = 'none';
