@@ -34,6 +34,31 @@
   const $ = id => root.getElementById(id);
   const dragSurface = root.querySelector('.box');
   let drag = null;
+  function movementBounds() {
+    const fullscreen = document.fullscreenElement;
+    if (fullscreen) {
+      const rect = fullscreen.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return rect;
+    }
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft || 0;
+    const top = viewport?.offsetTop || 0;
+    return {
+      left, top,
+      right: left + (viewport?.width || window.innerWidth),
+      bottom: top + (viewport?.height || window.innerHeight)
+    };
+  }
+  function placeOverlay(left, top) {
+    const bounds = movementBounds();
+    const rect = host.getBoundingClientRect();
+    const maxLeft = Math.max(bounds.left, bounds.right - rect.width);
+    const maxTop = Math.max(bounds.top, bounds.bottom - rect.height);
+    host.style.setProperty('left', `${Math.max(bounds.left, Math.min(maxLeft, left))}px`, 'important');
+    host.style.setProperty('top', `${Math.max(bounds.top, Math.min(maxTop, top))}px`, 'important');
+    host.style.setProperty('right', 'auto', 'important');
+    host.style.setProperty('bottom', 'auto', 'important');
+  }
   dragSurface.addEventListener('pointerdown', event => {
     if (event.button !== 0 || event.target.closest('button')) return;
     const rect = host.getBoundingClientRect();
@@ -41,19 +66,12 @@
     if (event.clientX >= rect.right - 24 && event.clientY >= rect.bottom - 24) return;
     event.preventDefault();
     drag = {pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top};
-    host.style.setProperty('left', `${rect.left}px`, 'important');
-    host.style.setProperty('top', `${rect.top}px`, 'important');
-    host.style.setProperty('right', 'auto', 'important');
-    host.style.setProperty('bottom', 'auto', 'important');
+    placeOverlay(rect.left, rect.top);
     dragSurface.setPointerCapture(event.pointerId);
   });
   dragSurface.addEventListener('pointermove', event => {
     if (!drag || drag.pointerId !== event.pointerId) return;
-    const rect = host.getBoundingClientRect();
-    const left = Math.max(0, Math.min(window.innerWidth - rect.width, event.clientX - drag.offsetX));
-    const top = Math.max(0, Math.min(window.innerHeight - rect.height, event.clientY - drag.offsetY));
-    host.style.setProperty('left', `${left}px`, 'important');
-    host.style.setProperty('top', `${top}px`, 'important');
+    placeOverlay(event.clientX - drag.offsetX, event.clientY - drag.offsetY);
   });
   const endDrag = event => {
     if (!drag || drag.pointerId !== event.pointerId) return;
@@ -83,7 +101,14 @@
     host.showPopover();
   }
   document.addEventListener('fullscreenchange', () => {
-    if (host.isConnected) requestAnimationFrame(promoteOverlay);
+    if (!host.isConnected) return;
+    requestAnimationFrame(() => {
+      promoteOverlay();
+      const rect = host.getBoundingClientRect();
+      const bounds = movementBounds();
+      const top = document.fullscreenElement ? bounds.bottom - rect.height : rect.top;
+      placeOverlay(rect.left, top);
+    });
   });
   function mount() {
     if (!isTop) return;
